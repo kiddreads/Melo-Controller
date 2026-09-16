@@ -46,6 +46,7 @@ public struct ControllerView: View {
     var gameId: String?
     var controller: any Controller
     @StateObject var controllerHandler = ControllerHandler()
+    @StateObject private var controllerBounds = ControllerBoundsModel()
     @AppStorage("On-ScreenControllerScale") private var controllerScale: Double = 1.0
     @AppStorage("stickButton") private var stickButton = false
     @State private var hideDpad = false
@@ -124,6 +125,13 @@ public struct ControllerView: View {
                 loadLayout()
             }
 
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { controllerBounds.containerSize = proxy.size }
+                    .onChange(of: proxy.size) { controllerBounds.containerSize = $0 }
+            }
+            .allowsHitTesting(false)
+
             // Edit Controls
             if isEditing {
                 if showEditControls {
@@ -151,7 +159,9 @@ public struct ControllerView: View {
                 }
             }
         }
+        .coordinateSpace(name: controllerCoordinateSpace)
         .environmentObject(controllerHandler)
+        .environmentObject(controllerBounds)
     }
 
     private func loadLayout() {

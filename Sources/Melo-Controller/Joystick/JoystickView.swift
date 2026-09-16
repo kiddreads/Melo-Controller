@@ -18,7 +18,25 @@ struct EditableJoystickView: View {
     @Binding var selectedButton: String?
     @GestureState private var dragOffset = CGSize.zero
     @AppStorage("On-ScreenControllerScale") var controllerScale: Double = 1.0
-    
+    @EnvironmentObject private var controllerBounds: ControllerBoundsModel
+    @State private var currentFrame: CGRect = .zero
+    @State private var isDragging = false
+
+    private func trackFrame() -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear { currentFrame = proxy.frame(in: .named(controllerCoordinateSpace)) }
+                .onChange(of: proxy.frame(in: .named(controllerCoordinateSpace))) { newFrame in
+                    currentFrame = newFrame
+                    guard !isDragging else { return }
+                    var offset = layout.joysticks[id]?.offset ?? .zero
+                    if clampOffsetToContainer(frame: newFrame, containerSize: controllerBounds.containerSize, offset: &offset) {
+                        layout.joysticks[id, default: JoystickLayout()].offset = offset
+                    }
+                }
+        }
+    }
+
     var body: some View {
         if isEditing {
             Circle()
@@ -35,6 +53,7 @@ struct EditableJoystickView: View {
                     x: (layout.joysticks[id]?.offset.width ?? 0) + dragOffset.width,
                     y: (layout.joysticks[id]?.offset.height ?? 0) + dragOffset.height
                 )
+                .background(trackFrame())
                 .onTapGesture {
                     selectedJoystick = selectedJoystick == id ? nil : id
                     selectedButton = nil
@@ -43,12 +62,18 @@ struct EditableJoystickView: View {
                     DragGesture()
                         .updating($dragOffset) { value, state, _ in
                             state = value.translation
+                            isDragging = true
                             selectedJoystick = id
                             selectedButton = nil
                         }
                         .onEnded { value in
-                            layout.joysticks[id, default: JoystickLayout()].offset.width += value.translation.width
-                            layout.joysticks[id, default: JoystickLayout()].offset.height += value.translation.height
+                            var offset = layout.joysticks[id]?.offset ?? .zero
+                            offset.width += value.translation.width
+                            offset.height += value.translation.height
+                            let draggedFrame = currentFrame.offsetBy(dx: value.translation.width, dy: value.translation.height)
+                            clampOffsetToContainer(frame: draggedFrame, containerSize: controllerBounds.containerSize, offset: &offset)
+                            layout.joysticks[id, default: JoystickLayout()].offset = offset
+                            isDragging = false
                         }
                 )
         } else {
@@ -56,6 +81,7 @@ struct EditableJoystickView: View {
                 .frame(width: 160, height: 160)
                 .scaleEffect(layout.joysticks[id]?.scale ?? CGFloat(controllerScale))
                 .offset(layout.joysticks[id]?.offset ?? .zero)
+                .background(trackFrame())
         }
     }
 }
