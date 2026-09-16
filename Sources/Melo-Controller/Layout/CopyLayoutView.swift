@@ -81,6 +81,24 @@ struct EditableButtonView: View {
     @Binding var selectedButton: String?
     @Binding var selectedJoystick: String?
     @GestureState private var dragOffset = CGSize.zero
+    @EnvironmentObject private var controllerBounds: ControllerBoundsModel
+    @State private var currentFrame: CGRect = .zero
+    @State private var isDragging = false
+
+    private func trackFrame() -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear { currentFrame = proxy.frame(in: .named(controllerCoordinateSpace)) }
+                .onChange(of: proxy.frame(in: .named(controllerCoordinateSpace))) { newFrame in
+                    currentFrame = newFrame
+                    guard !isDragging else { return }
+                    var offset = layout.buttons[button.id]?.offset ?? .zero
+                    if clampOffsetToContainer(frame: newFrame, containerSize: controllerBounds.containerSize, offset: &offset) {
+                        layout.buttons[button.id, default: ButtonLayout()].offset = offset
+                    }
+                }
+        }
+    }
 
     var body: some View {
         Group {
@@ -92,6 +110,7 @@ struct EditableButtonView: View {
                         x: (layout.buttons[button.id]?.offset.width ?? 0) + dragOffset.width,
                         y: (layout.buttons[button.id]?.offset.height ?? 0) + dragOffset.height
                     )
+                    .background(trackFrame())
                     .onTapGesture {
                         selectedButton = selectedButton == button.id ? nil : button.id
                         selectedJoystick = nil
@@ -100,12 +119,18 @@ struct EditableButtonView: View {
                         DragGesture()
                             .updating($dragOffset) { value, state, _ in
                                 state = value.translation
+                                isDragging = true
                                 selectedButton = button.id
                                 selectedJoystick = nil
                             }
                             .onEnded { value in
-                                layout.buttons[button.id, default: ButtonLayout()].offset.width += value.translation.width
-                                layout.buttons[button.id, default: ButtonLayout()].offset.height += value.translation.height
+                                var offset = layout.buttons[button.id]?.offset ?? .zero
+                                offset.width += value.translation.width
+                                offset.height += value.translation.height
+                                let draggedFrame = currentFrame.offsetBy(dx: value.translation.width, dy: value.translation.height)
+                                clampOffsetToContainer(frame: draggedFrame, containerSize: controllerBounds.containerSize, offset: &offset)
+                                layout.buttons[button.id, default: ButtonLayout()].offset = offset
+                                isDragging = false
                             }
                     )
             } else {
@@ -118,6 +143,7 @@ struct EditableButtonView: View {
                     ButtonView(controller: controller, button: button, layout: $layout)
                         .scaleEffect(layout.buttons[button.id]?.scale ?? 1.0)
                         .offset(layout.buttons[button.id]?.offset ?? .zero)
+                        .background(trackFrame())
                 }
             }
         }

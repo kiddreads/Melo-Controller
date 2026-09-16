@@ -16,7 +16,8 @@ struct LayoutOptionsView: View {
     let gameId: String?
     @Binding var layout: LayoutConfig
     @Environment(\.presentationMode) var presentationMode
-    
+    @AppStorage("On-ScreenControllerScale") private var controllerScale: Double = 1.0
+
     @State private var showingResetAlert = false
     @State private var showingCopySheet = false
     @State private var showingFileImporter = false
@@ -60,6 +61,34 @@ struct LayoutOptionsView: View {
                     }
                 }
                 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Overall Control Size")
+                        .font(.headline)
+
+                    Text("Resizes every button and joystick together, evenly. Controls are always kept on screen.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack {
+                        Image(systemName: "minus.magnifyingglass")
+                            .foregroundColor(.secondary)
+
+                        Slider(value: $controllerScale, in: 0.5...2.0, step: 0.05)
+                            .tint(.blue)
+
+                        Image(systemName: "plus.magnifyingglass")
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("\(Int(controllerScale * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Layout Actions")
                         .font(.headline)
